@@ -27,6 +27,58 @@ th{background:#f2f2f2}
 .alert-normal{background:#cce5ff}
 .alarmOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:none;justify-content:center;align-items:center;z-index:9999}
 .alarmCard{background:#fff;padding:30px;border-radius:10px;text-align:center}
+.usersTable{width:100%;margin-top:20px;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden}
+.usersTable th{background:#333;color:#fff;padding:10px}
+.usersTable td{padding:10px;text-align:center;border-bottom:1px solid #eee}
+.usersTable tr:hover{background:#f5f5f5}
+
+.action-btn{padding:5px 10px;margin:2px;border:none;border-radius:5px;cursor:pointer}
+.edit-btn{background:#3498db;color:#fff}
+.delete-btn{background:#e74c3c;color:#fff}
+
+.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;justify-content:center;align-items:center}
+.modal-content{background:#fff;padding:20px;border-radius:10px;width:300px;text-align:center}
+.usersForm{
+    display:flex;
+    gap:10px;
+    margin-bottom:20px;
+}
+
+.usersForm input{
+    flex:1;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.2);
+    background: #cce5ff;
+    color:#222;
+    transition:0.3s;
+}
+
+.usersForm input::placeholder{
+    color:#94a3b8;
+}
+
+.usersForm input:focus{
+    border-color:#38bdf8;
+    box-shadow:0 0 10px rgba(56,189,248,0.5);
+    outline:none;
+}
+
+/* BUTTON */
+.usersForm button{
+    padding:10px 15px;
+    border:none;
+    border-radius:8px;
+    background: linear-gradient(135deg,#2563eb,#38bdf8);
+    color:#fff;
+    cursor:pointer;
+    transition:0.3s;
+}
+
+.usersForm button:hover{
+    transform:translateY(-2px);
+    box-shadow:0 5px 15px rgba(56,189,248,0.5);
+}
 </style>
 </head>
 <body>
@@ -67,16 +119,44 @@ th{background:#f2f2f2}
             </div>
         </div>
 
-        <div id="usersPage" style="display:none;">
-            <h2>👤 Users Management</h2>
-            <div class="addUserBox">
-                <input id="newUser" placeholder="Username">
-                <input id="newPass" placeholder="Password">
-                <button onclick="addUser()">Add User</button>
-            </div>
-            <h3>All Users</h3>
-            <ul id="usersList"></ul>
+    <div id="usersPage" style="display:none;">
+    <div class="usersCard">
+
+        <h2>👤 Users Management</h2>
+
+        <div class="usersForm">
+            <input id="newUser" placeholder="Username">
+            <input id="newPass" placeholder="Password">
+            <button onclick="addUser()">Add</button>
         </div>
+
+        <table class="usersTable">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Password</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersTable"></tbody>
+        </table>
+
+    </div>
+</div>
+
+    </main>
+</div>
+
+<!-- MODAL -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3>Edit User</h3>
+        <input id="editUsername"><br><br>
+        <input id="editPassword"><br><br>
+        <button onclick="saveEdit()">Save</button>
+        <button onclick="closeModal()">Cancel</button>
+    </div>
+</div>
     </main>
 </div>
 
@@ -166,32 +246,132 @@ function applyFilter(){ renderTable() }
 function clearFilter(){ document.getElementById("dateFilter").value=""; document.getElementById("timeFilter").value=""; renderTable() }
 
 socket.on("deviceCount", count=>{ document.getElementById("devices").innerText=count })
+let currentEditUser = null
 
-function showDashboard(){ document.getElementById("dashboardPage").style.display="block"; document.getElementById("usersPage").style.display="none" }
-function showUsers(){ document.getElementById("dashboardPage").style.display="none"; document.getElementById("usersPage").style.display="block"; loadUsers() }
+function showDashboard(){
+    document.getElementById("dashboardPage").style.display="block"
+    document.getElementById("usersPage").style.display="none"
+}
 
+function showUsers(){
+    document.getElementById("dashboardPage").style.display="none"
+    document.getElementById("usersPage").style.display="block"
+    loadUsers()
+}
+
+// 🔥 LOAD USERS
 async function loadUsers(){
     const res = await fetch("/users")
     const data = await res.json()
-    const list = document.getElementById("usersList")
-    list.innerHTML = ""
+
+    const table = document.getElementById("usersTable")
+    table.innerHTML = ""
+
     data.forEach(user=>{
-        list.innerHTML+=`<li>👤 ${user.username} <button onclick="deleteUser('${user.username}')">❌</button></li>`
+        table.innerHTML += `
+        <tr>
+            <td>${user.username}</td>
+            <td>${user.password}</td>
+            <td>
+                <button class="action-btn edit-btn" onclick="openEdit('${user.username}','${user.password}')">Edit</button>
+                <button class="action-btn delete-btn" onclick="deleteUser('${user.username}')">Delete</button>
+            </td>
+        </tr>`
     })
 }
+
+// ➕ ADD USER
 async function addUser(){
     const username = document.getElementById("newUser").value
     const password = document.getElementById("newPass").value
-    if(!username||!password){alert("Fill all fields");return}
-    const res = await fetch("/add-user",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})})
+
+    if(!username || !password){
+        alert("❌ Fill all fields")
+        return
+    }
+
+    const res = await fetch("/add-user",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({username,password})
+    })
+
     const data = await res.json()
-    if(data.success){alert("✅ User Added"); loadUsers()} else{alert("❌ "+data.message)}
+
+    if(data.success){
+        alert("✅ Added")
+        loadUsers()
+    }else{
+        alert("❌ "+data.message)
+    }
 }
+
+// ❌ DELETE
 async function deleteUser(username){
     const res = await fetch(`/delete-user/${username}`,{method:"DELETE"})
     const data = await res.json()
-    if(data.success){alert("✅ User Deleted"); loadUsers()} else{alert("❌ "+data.message)}
+
+    if(data.success){
+        loadUsers()
+    }else{
+        alert(data.message)
+    }
 }
+
+// ✏️ OPEN EDIT
+function openEdit(username,password){
+    currentEditUser = username
+
+    document.getElementById("editUsername").value = username
+    document.getElementById("editPassword").value = password
+
+    document.getElementById("editModal").style.display = "flex"
+}
+
+// ❌ CLOSE MODAL
+function closeModal(){
+    document.getElementById("editModal").style.display = "none"
+}
+
+async function saveEdit(){
+    const username = document.getElementById("editUsername").value.trim()
+    const password = document.getElementById("editPassword").value.trim()
+
+    if(!username || !password){
+        alert("❌ Fill all fields")
+        return
+    }
+
+    if(!currentEditUser){
+        alert("❌ No user selected")
+        return
+    }
+
+    try{
+       const res = await fetch(`/update-user/${encodeURIComponent(currentEditUser)}`,{
+            method:"PUT",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body:JSON.stringify({username,password})
+        })
+
+        const data = await res.json()
+
+        if(data.success){
+            alert("✅ Updated")
+            closeModal()
+            loadUsers()
+        }else{
+            alert("❌ " + data.message)
+        }
+
+    }catch(err){
+        console.error(err)
+        alert("❌ Server error")
+    }
+}
+
 document.getElementById("closeAlarm").addEventListener("click", stopAlarm)
 </script>
 </body>

@@ -1,4 +1,3 @@
-// server.js
 const express = require("express")
 const http = require("http")
 const { Server } = require("socket.io")
@@ -6,11 +5,9 @@ const cors = require("cors")
 
 const app = express()
 const server = http.createServer(app)
-const io = new Server(server, {
-    cors: { origin: "*" } // يسمح لأي جهاز على الشبكة يتصل
-})
+const io = new Server(server, { cors: { origin: "*" } })
 
-app.use(express.static("public")) // فولدر المشروع فيه HTML/CSS/JS
+app.use(express.static("public"))
 app.use(express.json())
 app.use(cors())
 
@@ -27,8 +24,7 @@ let alarmActive = false
 app.post("/login", (req, res) => {
     const { username, password } = req.body
     const user = users.find(u => u.username === username && u.password === password)
-    if(user) return res.json({ success: true })
-    res.json({ success: false })
+    res.json({ success: !!user })
 })
 
 // GET USERS
@@ -47,15 +43,53 @@ app.post("/add-user", (req, res) => {
 app.delete("/delete-user/:username", (req, res) => {
     const { username } = req.params
     if(username === "admin") return res.json({ success:false, message:"Can't delete admin" })
-    const index = users.findIndex(u => u.username === username)
-    if(index === -1) return res.json({ success:false, message:"User not found" })
-    users.splice(index,1)
+    users = users.filter(u => u.username !== username)
     res.json({ success:true })
 })
 
-// SOCKET.IO
+// ✅ UPDATE USER
+app.put("/update-user/:oldUsername", (req, res) => {
+    try {
+        const oldUsername = decodeURIComponent(req.params.oldUsername)
+        const { username, password } = req.body
+
+        if(!username || !password){
+            return res.json({ success:false, message:"Missing data" })
+        }
+
+        users = loadUsers()
+
+        const index = users.findIndex(u => u.username === oldUsername)
+
+        if(index === -1){
+            return res.json({ success:false, message:"User not found" })
+        }
+
+        if(oldUsername === "admin"){
+            return res.json({ success:false, message:"Can't edit admin" })
+        }
+
+        // check duplicate
+        const exists = users.find(u => u.username === username && u.username !== oldUsername)
+        if(exists){
+            return res.json({ success:false, message:"Username already exists" })
+        }
+
+        // ✅ update
+        users[index] = { username, password }
+
+        saveUsers(users)
+
+        res.json({ success:true })
+
+    } catch (err) {
+        console.error("UPDATE ERROR:", err)
+        res.status(500).json({ success:false, message:"Server crash" })
+    }
+})
+
+// SOCKET
 io.on("connection", (socket) => {
-    console.log("🔥 DEVICE CONNECTED:", socket.id)
     connectedDevices.push(socket.id)
     io.emit("deviceCount", connectedDevices.length)
 
@@ -64,14 +98,9 @@ io.on("connection", (socket) => {
         io.emit("deviceCount", connectedDevices.length)
     })
 
-    socket.on("activateAlarm", () => {
-        alarmActive = true
-        io.emit("alarmStatus", { active:true })
-    })
-    socket.on("deactivateAlarm", () => {
-        alarmActive = false
-        io.emit("alarmStatus", { active:false })
-    })
+    socket.on("activateAlarm", () => alarmActive = true)
+    socket.on("deactivateAlarm", () => alarmActive = false)
+
     socket.on("simulateMotion", () => {
         if(alarmActive){
             const alert = {
@@ -85,8 +114,6 @@ io.on("connection", (socket) => {
     })
 })
 
-// 🚀 START SERVER
-// استعمل 0.0.0.0 عشان أي جهاز على نفس الشبكة يقدر يدخل
 server.listen(3000, "0.0.0.0", () => {
     console.log("Server running on http://0.0.0.0:3000")
 })
