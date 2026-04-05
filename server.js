@@ -1,13 +1,16 @@
+// server.js
 const express = require("express")
 const http = require("http")
-const socket = require("socket.io")
+const { Server } = require("socket.io")
 const cors = require("cors")
 
 const app = express()
 const server = http.createServer(app)
-const io = socket(server, { cors: { origin: "*" } })
+const io = new Server(server, {
+    cors: { origin: "*" } // يسمح لأي جهاز على الشبكة يتصل
+})
 
-app.use(express.static("public"))
+app.use(express.static("public")) // فولدر المشروع فيه HTML/CSS/JS
 app.use(express.json())
 app.use(cors())
 
@@ -50,9 +53,9 @@ app.delete("/delete-user/:username", (req, res) => {
     res.json({ success:true })
 })
 
-// SOCKET
+// SOCKET.IO
 io.on("connection", (socket) => {
-    console.log("🔥 DEVICE:", socket.id)
+    console.log("🔥 DEVICE CONNECTED:", socket.id)
     connectedDevices.push(socket.id)
     io.emit("deviceCount", connectedDevices.length)
 
@@ -82,4 +85,8 @@ io.on("connection", (socket) => {
     })
 })
 
-server.listen(3000, "0.0.0.0", () => console.log("Server running on http://localhost:3000"))
+// 🚀 START SERVER
+// استعمل 0.0.0.0 عشان أي جهاز على نفس الشبكة يقدر يدخل
+server.listen(3000, "0.0.0.0", () => {
+    console.log("Server running on http://0.0.0.0:3000")
+})
