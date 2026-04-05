@@ -1,0 +1,91 @@
+body{margin:0;font-family:Arial;background:#f0f2f5;}
+.layout{display:flex;}
+
+/* Sidebar */
+.sidebar{
+width:220px;
+background:#111;
+color:white;
+padding:20px;
+display:flex;
+flex-direction:column;
+gap:15px;
+height:100vh;
+position:fixed;
+}
+.sidebar h2{margin-bottom:20px;}
+.sidebar button{
+background:#1e293b;
+color:white;
+padding:12px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+transition:0.3s;
+}
+.sidebar button:hover{background:#2563eb;transform:scale(1.05);}
+
+/* Main */
+.main{margin-left:240px;padding:20px;flex:1;}
+
+/* Cards */
+.cards{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;}
+.card{flex:1 1 200px;padding:20px;border-radius:12px;color:white;font-weight:bold;box-shadow:0 5px 15px rgba(0,0,0,0.2);animation:cardIn 0.5s forwards;opacity:0;transform:translateY(50px);}
+.blue{background:#3498db;}
+.green{background:#2ecc71;}
+.orange{background:#e67e22;}
+.red{background:#e74c3c;}
+@keyframes cardIn{to{opacity:1;transform:translateY(0);}}
+
+/* Controls */
+.controls button{padding:10px 20px;margin:5px;border-radius:8px;border:none;cursor:pointer;transition:0.2s;}
+.controls button:hover{transform:scale(1.05);}
+
+/* Table */
+.tableBox{background:white;padding:20px;border-radius:12px;}
+.tableBox table{width:100%;border-collapse:collapse;}
+.tableBox th,.tableBox td{padding:10px;border:1px solid #ccc;}
+
+/* Users Page */
+.centerContent{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;}
+.addUserBox{display:flex;gap:10px;margin-bottom:20px;}
+.addUserBox input{padding:10px;border-radius:8px;border:1px solid #ccc;}
+.addUserBox button{background:#16a34a;color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;transition:0.3s;}
+.addUserBox button:hover{transform:scale(1.05);}
+#usersList{list-style:none;padding:0;width:300px;}
+#usersList li{padding:8px;background:#f1f5f9;margin:5px 0;border-radius:6px;opacity:0;animation:fadeIn 0.5s forwards;}
+@keyframes fadeIn{to{opacity:1;}}
+
+/* Alarm Overlay */
+.alarmOverlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;backdrop-filter:blur(8px);background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;}
+.alarmCard{background:white;padding:40px;border-radius:20px;text-align:center;width:300px;box-shadow:0 20px 50px rgba(0,0,0,0.3);transform:scale(0.7);opacity:0;animation:popup 0.4s forwards;}
+.alarmCard h1{color:red;margin-bottom:10px;}
+.alarmCard p{font-size:1.2rem;margin-bottom:20px;}
+#closeAlarm{background:red;color:white;border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-size:1rem;transition:0.2s;}
+#closeAlarm:hover{transform:scale(1.1);}
+@keyframes popup{to{opacity:1;transform:scale(1);}}
+
+.addUserBox{
+display:flex; gap:10px; margin-bottom:20px;
+justify-content:center;
+align-items:center;
+}
+
+.addUserBox input{ padding:10px; border-radius:8px; border:1px solid #ccc; }
+.addUserBox button{ background:#16a34a; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; }
+
+#usersList li{
+padding:8px;
+background:#f1f5f9;
+margin:5px 0;
+border-radius:6px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+#usersList li button{
+background:red;color:white;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;
+}
+
+#usersList li button:hover{transform:scale(1.1);}

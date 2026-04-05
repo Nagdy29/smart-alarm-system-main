@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+.layout{display:flex}
+.sidebar{width:220px;background:#222;color:#fff;padding:20px}
+.sidebar button{width:100%;margin:10px 0;padding:10px;border:none;border-radius:5px;cursor:pointer;background:#444;color:#fff}
+.main{flex:1;padding:20px}
+.cards{display:flex;gap:15px;margin-bottom:20px}
+.card{flex:1;padding:20px;color:#fff;border-radius:10px;text-align:center;font-weight:bold;transition:0.3s}
+.card:hover{transform:scale(1.05)}
+.blue{background:linear-gradient(135deg,#1e3c72,#2a5298)}
+.green{background:linear-gradient(135deg,#56ab2f,#a8e063)}
+.orange{background:linear-gradient(135deg,#ff8008,#ffc837)}
+.red{background:linear-gradient(135deg,#e53935,#e35d5b)}
+.controls button{margin-right:10px;padding:10px 15px;border:none;border-radius:5px;cursor:pointer;background:#555;color:#fff}
+.tableBox{margin-top:20px}
+.tableBox input{margin-right:10px;padding:5px 10px;border-radius:5px;border:1px solid #ccc}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{padding:8px 12px;text-align:center;border:1px solid #ccc}
+th{background:#f2f2f2}
+.alert-important{background:#ffcccc}
+.alert-normal{background:#cce5ff}
+.alarmOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:none;justify-content:center;align-items:center;z-index:9999}
+.alarmCard{background:#fff;padding:30px;border-radius:10px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="layout">
+    <aside class="sidebar">
+        <h2>🚨 Smart Alarm</h2>
+        <button onclick="showDashboard()">Dashboard</button>
+        <button onclick="showUsers()">Users</button>
+    </aside>
+
+    <main class="main">
+        <div id="dashboardPage">
+            <h1>Security Dashboard</h1>
+            <div class="cards">
+                <div class="card blue"><p>Devices</p><h2 id="devices">0</h2></div>
+                <div class="card green"><p>Alerts</p><h2 id="alerts">0</h2></div>
+                <div class="card orange"><p>Devices Received</p><h2 id="alertDevices">0</h2></div>
+                <div class="card red"><p>Last Alert</p><h3 id="alertTime">---</h3></div>
+            </div>
+
+            <div class="controls">
+                <button id="activateBtn" onclick="activate()">Activate</button>
+                <button id="deactivateBtn" onclick="deactivate()">Deactivate</button>
+                <button onclick="simulate()">Simulate</button>
+                <button onclick="stopAlarm()">Stop</button>
+            </div>
+
+            <div class="tableBox">
+                <h2>Alerts</h2>
+                <label>Date: </label><input type="date" id="dateFilter" onchange="applyFilter()">
+                <label>Time: </label><input type="time" id="timeFilter" onchange="applyFilter()">
+                <button onclick="clearFilter()">Clear Filter</button>
+                <table>
+                    <thead><tr><th>Message</th><th>Time</th><th>Devices</th></tr></thead>
+                    <tbody id="alertTable"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="usersPage" style="display:none;">
+            <h2>👤 Users Management</h2>
+            <div class="addUserBox">
+                <input id="newUser" placeholder="Username">
+                <input id="newPass" placeholder="Password">
+                <button onclick="addUser()">Add User</button>
+            </div>
+            <h3>All Users</h3>
+            <ul id="usersList"></ul>
+        </div>
+    </main>
+</div>
+
+<div id="alarmOverlay" class="alarmOverlay">
+    <div class="alarmCard">
+        <h1>🚨 Alarm Active</h1>
+        <p id="alarmMsg">Motion Detected</p>
+        <button id="closeAlarm">Stop Alarm</button>
+    </div>
+</div>
+
+<audio id="alarmSound" src="./sounds/alarm.mp3"></audio>
+
+<script>
+const socket = io()
+let alarmSound = document.getElementById("alarmSound")
+let alarmOverlay = document.getElementById("alarmOverlay")
+let alarmActive = false
+let allAlerts = []
+
+// Buttons
+function activate(){ 
+    alarmActive = true
+    socket.emit("activateAlarm") 
+    document.getElementById("activateBtn").disabled = true
+    document.getElementById("deactivateBtn").disabled = false
+}
+function deactivate(){ 
+    alarmActive = false
+    stopAlarmSound()
+    socket.emit("deactivateAlarm") 
+    document.getElementById("activateBtn").disabled = false
+    document.getElementById("deactivateBtn").disabled = true
+}
+function simulate(){ if(alarmActive) socket.emit("simulateMotion") }
+function stopAlarm(){ 
+    alarmActive = false
+    stopAlarmSound()
+    alarmOverlay.style.display="none"
+    document.getElementById("activateBtn").disabled = false
+    document.getElementById("deactivateBtn").disabled = true
+    socket.emit("deactivateAlarm") 
+}
+
+function playAlarmSound(){
+    alarmSound.pause()
+    alarmSound.currentTime = 0
+    alarmSound.play().catch(err => console.log("Audio play error:", err))
+}
+function stopAlarmSound(){ alarmSound.pause(); alarmSound.currentTime = 0 }
+
+// Motion Alerts
+socket.on("motionAlert", (alert) => {
+    if(!alarmActive) return
+
+    alarmOverlay.style.display="flex"
+    document.getElementById("alarmMsg").innerText = alert.message
+    playAlarmSound()
+
+    alert.type = alert.message.includes("Important") ? "important" : "normal"
+    allAlerts.push(alert)
+
+    document.getElementById("alerts").innerText = allAlerts.length
+    document.getElementById("alertDevices").innerText = alert.devices
+    document.getElementById("alertTime").innerText = alert.time
+    renderTable()
+})
+
+function renderTable(){
+    const table = document.getElementById("alertTable")
+    const dateFilter = document.getElementById("dateFilter").value
+    const timeFilter = document.getElementById("timeFilter").value
+    table.innerHTML = ""
+    allAlerts.forEach(alert=>{
+        const alertDate = alert.time.split(',')[0].trim()
+        const alertTime = alert.time.split(',')[1]?.trim()
+        if(dateFilter && alertDate !== dateFilter) return
+        if(timeFilter && alertTime !== timeFilter) return
+        const row = document.createElement("tr")
+        row.innerHTML = `<td>${alert.message}</td><td>${alert.time}</td><td>${alert.devices}</td>`
+        row.className = alert.type==="important"?"alert-important":"alert-normal"
+        table.prepend(row)
+    })
+}
+
+function applyFilter(){ renderTable() }
+function clearFilter(){ document.getElementById("dateFilter").value=""; document.getElementById("timeFilter").value=""; renderTable() }
+
+socket.on("deviceCount", count=>{ document.getElementById("devices").innerText=count })
+
+function showDashboard(){ document.getElementById("dashboardPage").style.display="block"; document.getElementById("usersPage").style.display="none" }
+function showUsers(){ document.getElementById("dashboardPage").style.display="none"; document.getElementById("usersPage").style.display="block"; loadUsers() }
+
+async function loadUsers(){
+    const res = await fetch("/users")
+    const data = await res.json()
+    const list = document.getElementById("usersList")
+    list.innerHTML = ""
+    data.forEach(user=>{
+        list.innerHTML+=`<li>👤 ${user.username} <button onclick="deleteUser('${user.username}')">❌</button></li>`
+    })
+}
+async function addUser(){
+    const username = document.getElementById("newUser").value
+    const password = document.getElementById("newPass").value
+    if(!username||!password){alert("Fill all fields");return}
+    const res = await fetch("/add-user",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})})
+    const data = await res.json()
+    if(data.success){alert("✅ User Added"); loadUsers()} else{alert("❌ "+data.message)}
+}
+async function deleteUser(username){
+    const res = await fetch(`/delete-user/${username}`,{method:"DELETE"})
+    const data = await res.json()
+    if(data.success){alert("✅ User Deleted"); loadUsers()} else{alert("❌ "+data.message)}
+}
+document.getElementById("closeAlarm").addEventListener("click", stopAlarm)
+</script>
+</body>
+</html>
